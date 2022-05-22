@@ -3,6 +3,15 @@ const fs = require('fs/promises');
 
 const TARGET = path.join(__dirname, 'project-dist');
 
+async function rmDir(dir) {
+  const entries = await fs.readdir(dir, {withFileTypes: true});
+  await Promise.all(entries.map(entry => {
+    const fullPath = path.join(dir, entry.name);
+    return entry.isDirectory() ? rmDir(fullPath) : fs.unlink(fullPath);
+  }));
+  await fs.rmdir(dir);
+}
+
 async function createMain(){
   let content = await (await fs.readFile(path.join(__dirname, 'template.html'))).toString();
 
@@ -43,7 +52,6 @@ async function readStyles() {
   }
 }
 
-
 async function copyAssets(sourcePath, targetPath, dirName){
   await fs.mkdir(path.join(targetPath, dirName), {recursive: true});
   const entries = await fs.readdir(path.join(sourcePath, dirName), {withFileTypes: true});
@@ -68,6 +76,12 @@ async function buildPage() {
     await fs.mkdir(TARGET, {recursive: true});
     await createMain();
     await readStyles();
+
+    const assetsPath = path.join(TARGET, 'assets');
+    const isDirExists = !!(await fs.stat(assetsPath).catch(e => false));
+    if (isDirExists) {
+      await rmDir(assetsPath);
+    }
     await copyAssets(__dirname, TARGET, 'assets');
   } catch (err) {
     console.error(err.message);
